@@ -1,8 +1,8 @@
-import { Server } from './server';
+import { createServer } from './server';
 import { GameServer } from './game_server';
 import { readPacketData } from './client_packet/client_packet_reader';
 
-const server = new Server(25565);
+const server = createServer(25565);
 server.start(rawPacket => {
 	const clientPacket = readPacketData(rawPacket.data);
 	if (clientPacket === null) {

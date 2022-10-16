@@ -6,7 +6,12 @@ type RawPacket = {
 	port: number;
 }
 
-export class Server {
+interface Server {
+	start(listener: (rawPacket: RawPacket) => void): void;
+	stop(): void;
+}
+
+class UDPServer implements Server {
 
 	private socket: dgram.Socket;
 
@@ -50,4 +55,8 @@ export class Server {
 			this.socket = null;
 		}
 	}
+}
+
+export const createServer = (port: number): Server => {
+	return new UDPServer(25565);
 }
