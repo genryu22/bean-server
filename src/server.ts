@@ -43,4 +43,11 @@ export class Server {
 
 		this.socket.bind(this.port);
 	}
+
+	stop() {
+		if (this.socket) {
+			this.socket.close();
+			this.socket = null;
+		}
+	}
 }

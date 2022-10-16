@@ -1,4 +1,5 @@
 import { isClientConnectionPacket } from './client_packet/c_connection'
+import { readMasterData } from './master/masterdata_reader'
 
 type Player = {
 	ip: string;
@@ -11,15 +12,25 @@ export class GameServer {
 
 	private players: Player[];
 
+	private masterDataList: object[];
+
 	constructor() {
 		this.isRunning = false;
 		this.players = [];
 	}
 
-	start(): void {
+	async start(): Promise<void> {
 		if (this.isRunning) {
-			console.log('server is running');
+			console.log('server is already running');
 			return;
+		}
+		try {
+			console.log('loading masterdata...');
+			this.masterDataList = await readMasterData();
+			console.log('completed loading masterdata...');
+			this.isRunning = true;
+		} catch (err) {
+			throw err;
 		}
 	}
 
