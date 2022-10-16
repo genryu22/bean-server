@@ -7,35 +7,31 @@ type Player = {
 	name: string;
 };
 
-class DateTime {
+type DateTime = {
+	value: number;
+}
 
-	private value: number;
+const getCurrentTime = (): DateTime => {
+	return { value: Date.now() };
+}
 
-	constructor(value) {
-		this.value = value;
-	}
+const after = (seconds: number): DateTime => {
+	return { value: Date.now() + seconds * 1000 };
+}
 
-	isBefore(dateTime: DateTime): boolean {
-		return this.value < dateTime.value;
-	}
-
-	static Now(): DateTime {
-		return new DateTime(Date.now());
-	}
-
-	static After(seconds: number): DateTime {
-		return new DateTime(Date.now() + seconds * 1000);
-	}
+const compare = (a: DateTime, b: DateTime): boolean => {
+	return a.value < b.value;
 }
 
 const calcNextEventTime = (event: MasterEvent): DateTime => {
 	if (event.length_type === 'const') {
-		return DateTime.After(event.length);
+		return after(event.length);
 	} else {
-		return DateTime.After(60 * 60 / event.length);
+		return after(60 * 60 / event.length);
 	}
 }
 
+// セーブとロードができるようにmasterDataList以外のオブジェクトはpureなTypeにする。
 class Game {
 
 	private masterDataList: object[][];
@@ -63,10 +59,10 @@ class Game {
 
 	update() {
 		{
-			const now = DateTime.Now();
+			const now = getCurrentTime();
 
 			{
-				const currentEvents = this.eventHistory.filter(h => h.next.isBefore(now));
+				const currentEvents = this.eventHistory.filter(h => compare(h.next, now));
 				for (let e of currentEvents) {
 					if (e.event.type == 'tick') {
 						console.log('tick');
