@@ -1,11 +1,45 @@
-import { isClientConnectionPacket } from './client_packet/c_connection'
-import { readMasterData } from './master/masterdata_reader'
-import { MasterEvent, isMasterEvent } from './master/master_event'
+import { v4 as uuidv4 } from 'uuid';
+import { isClientConnectionPacket } from './client_packet/c_connection';
+import { readMasterData } from './master/masterdata_reader';
+
+import { MasterEvent, isMasterEvent } from './master/master_event';
+import { MasterTitle, isMasterTitle } from './master/master_title';
+import { MasterPlant, isMasterPlant } from './master/master_plant';
+
+type Position = {
+	x: number;
+	y: number;
+}
 
 type Player = {
 	ip: string;
 	name: string;
-};
+}
+
+type FieldTile = {
+	id: string;
+	position: Position;
+	fixed_object_type: string | null;
+	fixed_object_id: string | null;
+}
+
+type FarmTile = {
+	id: string;
+	water: number;
+	fertility: number;
+	weed_amount: number;
+}
+
+type Plant = {
+	id: string;
+	plant_type: string;
+	growth: number;
+	tiles: string[]; // FarmTileのID
+	harvest_count: number;
+	color: { r: number, g: number, b: number };
+	has_caterpillar: boolean;
+	titles: string[]; // MasterTitle[]にはできない。あくまで参照するため。
+}
 
 type DateTime = {
 	value: number;
@@ -40,19 +74,44 @@ class Game {
 
 	private eventHistory: { event: MasterEvent, next: DateTime }[]
 
+	private fieldTiles: FieldTile[];
+
+	private plants: Plant[];
+
 	constructor(masterDataList: object[][]) {
 		this.masterDataList = masterDataList;
 		this.players = [];
 		this.eventHistory = [];
+		this.fieldTiles = [];
 	}
 
 	init() {
 		{
-			for (let event of this.getMasterEvent()) {
+			for (let event of getMaster(this.masterDataList, isMasterEvent)) {
 				if (this.eventHistory.some(h => h.event.type == event.type)) {
 					continue;
 				}
 				this.eventHistory = [...this.eventHistory, { event, next: calcNextEventTime(event) }]
+			}
+		}
+
+		{
+			const size = {
+				width: 30,
+				height: 30,
+			} as const;
+			for (let x = 0; x < size.width; ++x) {
+				for (let y = 0; y < size.height; ++y) {
+					if (this.fieldTiles.some(t => t.position.x == x && t.position.y == y) {
+						continue;
+					}
+					this.fieldTiles = [...this.fieldTiles, {
+						id: createID(),
+						position: { x, y },
+						fixed_object_type: null,
+						fixed_object_id: null,
+					}]
+				}
 			}
 		}
 	}
@@ -66,12 +125,16 @@ class Game {
 				for (let e of currentEvents) {
 					if (e.event.type == 'tick') {
 						console.log('tick');
+						this.tick();
 						this.eventHistory = [...this.eventHistory, { event: e.event, next: calcNextEventTime(e.event) }];
 					}
 				}
 				this.eventHistory = this.eventHistory.filter(h => !currentEvents.includes(h));
 			}
 		}
+	}
+
+	tick() {
 	}
 
 	addPlayer(player: Player) {
@@ -82,19 +145,23 @@ class Game {
 			console.log(`${player.name}:${player.ip} connected.`);
 		}
 	}
-
-	private getMasterEvent(): MasterEvent[] | null {
-		const filtered = this.masterDataList.filter(d => d.every(isMasterEvent)) as MasterEvent[][];
-		if (filtered.length == 0) {
-			return null;
-		} else {
-			return filtered[0];
-		}
-	}
 }
 
 const sleep = (duration: number): Promise<void> => {
 	return new Promise(resolve => setTimeout(resolve, duration));
+}
+
+const createID = (): string => {
+	return uuidv4();
+}
+
+const getMaster = <T>(masterDataList: object[][], isT: (data: any) => data is T): T[] | null => {
+	const filtered = masterDataList.filter(d => d.every(isT)) as T[][];
+	if (filtered.length == 0) {
+		return null;
+	} else {
+		return filtered[0];
+	}
 }
 
 export class GameServer {

@@ -13,7 +13,7 @@ type MasterTitle = {
 	title_prob_factor: number,
 };
 
-export const isMasterTitle = (data: any): data is MasterTitle => {
+const isMasterTitle = (data: any): data is MasterTitle => {
 	return 'type' in data && typeof data['type'] === 'string'
 		&& 'rarity' in data && (data['rarity'] == 'F' || data['rarity'] == 'N' || data['rarity'] == 'S' || data['rarity'] == 'S+')
 		&& 'sell_price_factor' in data && typeof data['sell_price_factor'] === 'number'
@@ -27,3 +27,5 @@ export const isMasterTitle = (data: any): data is MasterTitle => {
 		&& 'crop_count_factor' in data && typeof data['crop_count_factor'] === 'number'
 		&& 'title_prob_factor' in data && typeof data['title_prob_factor'] === 'number'
 };
+
+export { MasterTitle, isMasterTitle };

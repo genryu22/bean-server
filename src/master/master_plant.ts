@@ -11,7 +11,7 @@ type MasterPlant = {
 	title_prob: number,
 };
 
-export const isMasterPlant = (data: any): data is MasterPlant => {
+const isMasterPlant = (data: any): data is MasterPlant => {
 	return 'type' in data && typeof data['type'] === 'string'
 		&& 'size' in data && typeof data['size'] === 'number'
 		&& 'max_growth' in data && typeof data['max_growth'] === 'number'
@@ -23,3 +23,5 @@ export const isMasterPlant = (data: any): data is MasterPlant => {
 		&& 'crop_count' in data && typeof data['crop_count'] === 'number'
 		&& 'title_prob' in data && typeof data['title_prob'] === 'number'
 };
+
+export { MasterPlant, isMasterPlant }
