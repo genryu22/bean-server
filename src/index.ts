@@ -9,7 +9,7 @@ server.start(rawPacket => {
 		return;
 	}
 	if (gameServer) {
-		gameServer.readPacket(clientPacket, rawPacket.ip, rawPacket.port);
+		gameServer.receivePacket(clientPacket, rawPacket.ip, rawPacket.port);
 	}
 });
 const gameServer = new GameServer();
