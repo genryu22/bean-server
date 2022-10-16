@@ -204,7 +204,7 @@ class Game {
 		if (item === null) {
 			this.items = [...this.items, {
 				type: plant_master[0].crop,
-				titles: plant.seed_titles,
+				titles: [...plant.seed_titles],
 				count: plant_master[0].crop_count,
 			}]
 		} else {
