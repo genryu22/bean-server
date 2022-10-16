@@ -34,11 +34,18 @@ type Plant = {
 	id: string;
 	plant_type: string;
 	growth: number;
-	tiles: string[]; // FarmTileのID
+	farm_tile_ids: string[]; // FarmTileのid
 	harvest_count: number;
 	color: { r: number, g: number, b: number };
 	has_caterpillar: boolean;
-	titles: string[]; // MasterTitle[]にはできない。あくまで参照するため。
+	body_titles: string[]; // MasterTitle[]にはできない。あくまで参照するため。
+	seed_titles: string[]; // MasterTitle[]にはできない。あくまで参照するため。
+}
+
+type Item = { // あえてidをつけていない。種類と称号で分ける。
+	type: string;
+	titles: string[];
+	count: number;
 }
 
 type DateTime = {
@@ -61,7 +68,7 @@ const calcNextEventTime = (event: MasterEvent): DateTime => {
 	if (event.length_type === 'const') {
 		return after(event.length);
 	} else {
-		return after(60 * 60 / event.length);
+		return after(60 * 60 / event.length); //TODO ランダム化
 	}
 }
 
@@ -76,13 +83,20 @@ class Game {
 
 	private fieldTiles: FieldTile[];
 
+	private farmTiles: FarmTile[];
+
 	private plants: Plant[];
+
+	private items: Item[];
 
 	constructor(masterDataList: object[][]) {
 		this.masterDataList = masterDataList;
 		this.players = [];
 		this.eventHistory = [];
 		this.fieldTiles = [];
+		this.farmTiles = [];
+		this.plants = [];
+		this.items = [];
 	}
 
 	init() {
@@ -102,7 +116,7 @@ class Game {
 			} as const;
 			for (let x = 0; x < size.width; ++x) {
 				for (let y = 0; y < size.height; ++y) {
-					if (this.fieldTiles.some(t => t.position.x == x && t.position.y == y) {
+					if (this.fieldTiles.some(t => t.position.x == x && t.position.y == y)) {
 						continue;
 					}
 					this.fieldTiles = [...this.fieldTiles, {
@@ -124,7 +138,6 @@ class Game {
 				const currentEvents = this.eventHistory.filter(h => compare(h.next, now));
 				for (let e of currentEvents) {
 					if (e.event.type == 'tick') {
-						console.log('tick');
 						this.tick();
 						this.eventHistory = [...this.eventHistory, { event: e.event, next: calcNextEventTime(e.event) }];
 					}
@@ -135,14 +148,110 @@ class Game {
 	}
 
 	tick() {
+		console.log('tick');
+		for (let farmTile of this.farmTiles) {
+			farmTile.weed_amount += 1;
+		}
+		for (let plant of this.plants) {
+			if (plant.has_caterpillar) {
+				plant.growth -= 1;
+			} else if (this.convertFarmTileIDs(plant.farm_tile_ids).every(t => t.fertility > 0 && t.water > 0 && t.weed_amount < 20)) {
+				plant.growth += 1;
+				for (let t of this.convertFarmTileIDs(plant.farm_tile_ids)) {
+					t.fertility -= 1;
+					t.water -= 1;
+				}
+
+				const plant_master = getMaster(this.masterDataList, isMasterPlant).filter(mp => mp.type == plant.plant_type);
+				if (plant_master.length == 0) {
+					console.log(`${plant.plant_type} 植物マスターが存在しません。`);
+				} else {
+					if (plant.seed_titles.length < 3) {
+						const newTitle = this.randomTitle();
+						if (newTitle !== null) {
+							plant.seed_titles = [...plant.seed_titles, newTitle];
+						}
+					}
+				}
+			}
+		}
 	}
 
-	addPlayer(player: Player) {
+	harvest(ip: string, plant_id: string): void {
+		const player = this.findPlayerByIP(ip);
+		if (player == null) {
+			console.log(`${ip} プレイヤーが存在しません。`);
+			return;
+		}
+		const plant = this.findPlantByID(plant_id);
+		if (plant === null) {
+			console.log(`${player.name}:${ip} 植物が存在しません。`);
+			return;
+		}
+
+		if (plant.growth < 100) {
+			console.log(`${player.name}:${ip} 成長量が十分ではありません。`)
+			return;
+		}
+
+		const plant_master = getMaster(this.masterDataList, isMasterPlant).filter(mp => mp.type == plant.plant_type);
+		if (plant_master.length == 0) {
+			console.log(`${player.name}:${ip} 植物マスターが存在しません。`);
+			return;
+		}
+
+		const item = this.findItemByTypeAndTitles(plant_master[0].crop, plant.seed_titles)
+		if (item === null) {
+			this.items = [...this.items, {
+				type: plant_master[0].crop,
+				titles: plant.seed_titles,
+				count: plant_master[0].crop_count,
+			}]
+		} else {
+			item.count += plant_master[0].crop_count
+		}
+	}
+
+	addPlayer(player: Player): void {
 		if (this.players.some(p => p.ip == player.ip)) {
 			console.log(`${player.name}:${player.ip} try to connect, but already connected.`);
 		} else {
 			this.players = [...this.players, player]
 			console.log(`${player.name}:${player.ip} connected.`);
+		}
+	}
+
+	randomTitle(): string | null {
+		return null
+	}
+
+	convertFarmTileIDs(ids: string[]): FarmTile[] {
+		return ids.map(this.findFarmTileByID).filter(ft => ft !== null);
+	}
+
+	findFarmTileByID(id: string): FarmTile | null {
+		return findByID(this.farmTiles, id);
+	}
+
+	findPlantByID(id: string): Plant | null {
+		return findByID(this.plants, id);
+	}
+
+	findItemByTypeAndTitles(type: string, titles: string[]): Item | null {
+		const res = this.items.filter(i => i.type == type && compareArrays(i.titles, titles));
+		if (res.length > 0) {
+			return res[0];
+		} else {
+			return null;
+		}
+	}
+
+	findPlayerByIP(ip: string): Player | null {
+		const res = this.players.filter(p => p.ip == ip);
+		if (res.length > 0) {
+			return res[0];
+		} else {
+			return null;
 		}
 	}
 }
@@ -155,6 +264,15 @@ const createID = (): string => {
 	return uuidv4();
 }
 
+const findByID = <T extends { id: string }>(list: T[], id: string): T | null => {
+	const res = list.filter(d => d.id == id);
+	if (res.length > 0) {
+		return res[0];
+	} else {
+		return null;
+	}
+}
+
 const getMaster = <T>(masterDataList: object[][], isT: (data: any) => data is T): T[] | null => {
 	const filtered = masterDataList.filter(d => d.every(isT)) as T[][];
 	if (filtered.length == 0) {
@@ -162,6 +280,10 @@ const getMaster = <T>(masterDataList: object[][], isT: (data: any) => data is T)
 	} else {
 		return filtered[0];
 	}
+}
+
+const compareArrays = (a: string[], b: string[]): boolean => {
+	return a.every(s => b.includes(s)) && b.every(s => a.includes(s))
 }
 
 export class GameServer {

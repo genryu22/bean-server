@@ -1,7 +1,6 @@
 type MasterItem = {
 	type: string,
 	category: string,
-	stack_size: number,
 	sell_price: number,
 	buy_price: number,
 	gacha_a: boolean,
@@ -12,7 +11,6 @@ type MasterItem = {
 export const isMasterItem = (data: any): data is MasterItem => {
 	return 'type' in data && typeof data['type'] === 'string'
 		&& 'category' in data && typeof data['category'] === 'string'
-		&& 'stack_size' in data && typeof data['stack_size'] === 'number'
 		&& 'sell_price' in data && typeof data['sell_price'] === 'number'
 		&& 'buy_price' in data && typeof data['buy_price'] === 'number'
 		&& 'gacha_a' in data && typeof data['gacha_a'] === 'boolean'
