@@ -5,6 +5,7 @@ import { readMasterData } from './master/masterdata_reader';
 import { MasterEvent, isMasterEvent } from './master/master_event';
 import { MasterTitle, isMasterTitle } from './master/master_title';
 import { MasterPlant, isMasterPlant } from './master/master_plant';
+import { MasterShopItem, isMasterShopItem } from './master/master_shop_item';
 
 type Position = {
 	x: number;
@@ -72,14 +73,25 @@ const calcNextEventTime = (event: MasterEvent): DateTime => {
 	}
 }
 
-// セーブとロードができるようにmasterDataList以外のオブジェクトはpureなTypeにする。
+class PacketSender {
+
+	sendShopItem(player: Player, master_shop_item: MasterShopItem): void {
+
+	}
+}
+
+// セーブとロードができるようにmasterDataList, packetsender以外のオブジェクトはpureなTypeにする。
 class Game {
 
 	private masterDataList: object[][];
 
+	private packetSender: PacketSender;
+
+	private money: number;
+
 	private players: Player[];
 
-	private eventHistory: { event: MasterEvent, next: DateTime }[]
+	private event_history: { event: MasterEvent, next: DateTime }[]
 
 	private fieldTiles: FieldTile[];
 
@@ -89,10 +101,12 @@ class Game {
 
 	private items: Item[];
 
+	private item_history: string[];
+
 	constructor(masterDataList: object[][]) {
 		this.masterDataList = masterDataList;
 		this.players = [];
-		this.eventHistory = [];
+		this.event_history = [];
 		this.fieldTiles = [];
 		this.farmTiles = [];
 		this.plants = [];
@@ -100,12 +114,14 @@ class Game {
 	}
 
 	init() {
+		this.packetSender = new PacketSender();
+
 		{
 			for (let event of getMaster(this.masterDataList, isMasterEvent)) {
-				if (this.eventHistory.some(h => h.event.type == event.type)) {
+				if (this.event_history.some(h => h.event.type == event.type)) {
 					continue;
 				}
-				this.eventHistory = [...this.eventHistory, { event, next: calcNextEventTime(event) }]
+				this.event_history = [...this.event_history, { event, next: calcNextEventTime(event) }]
 			}
 		}
 
@@ -135,14 +151,14 @@ class Game {
 			const now = getCurrentTime();
 
 			{
-				const currentEvents = this.eventHistory.filter(h => compare(h.next, now));
+				const currentEvents = this.event_history.filter(h => compare(h.next, now));
 				for (let e of currentEvents) {
 					if (e.event.type == 'tick') {
 						this.tick();
-						this.eventHistory = [...this.eventHistory, { event: e.event, next: calcNextEventTime(e.event) }];
+						this.event_history = [...this.event_history, { event: e.event, next: calcNextEventTime(e.event) }];
 					}
 				}
-				this.eventHistory = this.eventHistory.filter(h => !currentEvents.includes(h));
+				this.event_history = this.event_history.filter(h => !currentEvents.includes(h));
 			}
 		}
 	}
@@ -221,23 +237,23 @@ class Game {
 		}
 	}
 
-	randomTitle(): string | null {
+	private randomTitle(): string | null {
 		return null
 	}
 
-	convertFarmTileIDs(ids: string[]): FarmTile[] {
+	private convertFarmTileIDs(ids: string[]): FarmTile[] {
 		return ids.map(this.findFarmTileByID).filter(ft => ft !== null);
 	}
 
-	findFarmTileByID(id: string): FarmTile | null {
+	private findFarmTileByID(id: string): FarmTile | null {
 		return findByID(this.farmTiles, id);
 	}
 
-	findPlantByID(id: string): Plant | null {
+	private findPlantByID(id: string): Plant | null {
 		return findByID(this.plants, id);
 	}
 
-	findItemByTypeAndTitles(type: string, titles: string[]): Item | null {
+	private findItemByTypeAndTitles(type: string, titles: string[]): Item | null {
 		const res = this.items.filter(i => i.type == type && compareArrays(i.titles, titles));
 		if (res.length > 0) {
 			return res[0];
@@ -246,7 +262,7 @@ class Game {
 		}
 	}
 
-	findPlayerByIP(ip: string): Player | null {
+	private findPlayerByIP(ip: string): Player | null {
 		const res = this.players.filter(p => p.ip == ip);
 		if (res.length > 0) {
 			return res[0];
