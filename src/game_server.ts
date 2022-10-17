@@ -6,6 +6,7 @@ import { MasterEvent, isMasterEvent } from './master/master_event';
 import { MasterTitle, isMasterTitle } from './master/master_title';
 import { MasterPlant, isMasterPlant } from './master/master_plant';
 import { MasterShopItem, isMasterShopItem } from './master/master_shop_item';
+import { isMasterItem } from './master/master_item';
 
 type Position = {
 	x: number;
@@ -15,6 +16,7 @@ type Position = {
 type Player = {
 	ip: string;
 	name: string;
+	port: number;
 }
 
 type FieldTile = {
@@ -75,6 +77,16 @@ const calcNextEventTime = (event: MasterEvent): DateTime => {
 
 class PacketSender {
 
+	private sender: (packet: object, ip: string, port: number) => void;
+
+	constructor(sender: (packet: object, ip: string, port: number) => void) {
+		this.sender = sender;
+	}
+
+	sendAllData(player: Player, gameData: object): void {
+		this.sender(gameData, player.ip, player.port);
+	}
+
 	sendShopItem(player: Player, master_shop_item: MasterShopItem): void {
 
 	}
@@ -105,16 +117,18 @@ class Game {
 
 	constructor(masterDataList: object[][]) {
 		this.masterDataList = masterDataList;
+		this.money = 0;
 		this.players = [];
 		this.event_history = [];
 		this.fieldTiles = [];
 		this.farmTiles = [];
 		this.plants = [];
 		this.items = [];
+		this.item_history = [];
 	}
 
-	init() {
-		this.packetSender = new PacketSender();
+	init(sender: (packet: object, ip: string, port: number) => void) {
+		this.packetSender = new PacketSender(sender);
 
 		{
 			for (let event of getMaster(this.masterDataList, isMasterEvent)) {
@@ -156,6 +170,10 @@ class Game {
 					if (e.event.type == 'tick') {
 						this.tick();
 						this.event_history = [...this.event_history, { event: e.event, next: calcNextEventTime(e.event) }];
+
+						for (let p of this.players) {
+							this.packetSender.sendAllData(p, this.toGameData());
+						}
 					}
 				}
 				this.event_history = this.event_history.filter(h => !currentEvents.includes(h));
@@ -216,16 +234,7 @@ class Game {
 			return;
 		}
 
-		const item = this.findItemByTypeAndTitles(plant_master[0].crop, plant.seed_titles)
-		if (item === null) {
-			this.items = [...this.items, {
-				type: plant_master[0].crop,
-				titles: [...plant.seed_titles],
-				count: plant_master[0].crop_count,
-			}]
-		} else {
-			item.count += plant_master[0].crop_count
-		}
+		this.addItem(plant_master[0].crop, plant.seed_titles, plant_master[0].crop_count);
 	}
 
 	addPlayer(player: Player): void {
@@ -234,6 +243,51 @@ class Game {
 		} else {
 			this.players = [...this.players, player]
 			console.log(`${player.name}:${player.ip} connected.`);
+		}
+	}
+
+	buy(ip: string, item_type: string, count: number): void {
+		if (count <= 0) {
+			console.log(`${ip} 購入数が不正`);
+			return;
+		}
+		const player = this.findPlayerByIP(ip);
+		if (player == null) {
+			console.log(`${ip} プレイヤーが存在しません。`);
+			return;
+		}
+
+		const shopItems = getMaster(this.masterDataList, isMasterShopItem);
+		if (shopItems.every(si => si.item_type != item_type)) {
+			console.log(`${player.name}:${ip} ショップにアイテム ${item_type} が登録されていません。`);
+			return;
+		}
+
+		const itemMasters = getMaster(this.masterDataList, isMasterItem).filter(im => im.type == item_type);
+		if (itemMasters.length == 0) {
+			console.log(`${player.name}:${ip} マスターにアイテム ${item_type} が登録されていません。`);
+			return;
+		}
+
+		if (itemMasters[0].buy_price * count > this.money) {
+			console.log(`${player.name}:${ip} ${item_type} ${this.money} お金が足りません`);
+			return;
+		}
+
+		this.money -= itemMasters[0].buy_price * count;
+		this.addItem(item_type, [], count);
+	}
+
+	private addItem(item_type: string, titles: string[], count: number) {
+		const item = this.findItemByTypeAndTitles(item_type, titles)
+		if (item === null) {
+			this.items = [...this.items, {
+				type: item_type,
+				titles: [...titles],
+				count: count,
+			}]
+		} else {
+			item.count += count
 		}
 	}
 
@@ -268,6 +322,19 @@ class Game {
 			return res[0];
 		} else {
 			return null;
+		}
+	}
+
+	private toGameData(): object {
+		return {
+			money: this.money,
+			players: this.players,
+			event_history: this.event_history,
+			fieldTiles: this.fieldTiles,
+			farmTiles: this.farmTiles,
+			plants: this.plants,
+			items: this.items,
+			item_history: this.item_history,
 		}
 	}
 }
@@ -308,14 +375,14 @@ export class GameServer {
 
 	private game: Game;
 
-	private packetQueue: { packet: object, ip: string, port: number }[];
+	private packetQueue: object[];
 
 	constructor() {
 		this.isRunning = false;
 		this.packetQueue = [];
 	}
 
-	async start(): Promise<void> {
+	async start(sender: (packet: object, ip: string, port: number) => void): Promise<void> {
 		if (this.isRunning) {
 			console.log('server is already running');
 			return;
@@ -327,24 +394,23 @@ export class GameServer {
 
 			this.isRunning = true;
 
-			await this.gameRoutine(masterDataList);
+			await this.gameRoutine(masterDataList, sender);
 		} catch (err) {
 			throw err;
 		}
 	}
 
-	receivePacket(packet: object, ip: string, port: number): void {
-		this.packetQueue = [...this.packetQueue, { packet, ip, port }];
+	receivePacket(packet: object): void {
+		this.packetQueue = [...this.packetQueue, packet];
 	}
 
-	private async gameRoutine(masterDataList: object[][]): Promise<void> {
+	private async gameRoutine(masterDataList: object[][], sender: (packet: object, ip: string, port: number) => void): Promise<void> {
 		this.game = new Game(masterDataList);
-		this.game.init();
+		this.game.init(sender);
 		while (true) {
 			for (let p of this.packetQueue) {
-				const packet = p.packet;
-				if (isClientConnectionPacket(packet)) {
-					this.game.addPlayer({ name: packet.name, ip: p.ip });
+				if (isClientConnectionPacket(p)) {
+					this.game.addPlayer({ name: p.name, ip: p.ip, port: p.port });
 				}
 			}
 			this.packetQueue = [];
