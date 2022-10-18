@@ -1,8 +1,8 @@
-import { Player } from "../game_server";
+import { GameData, Plant, Player } from "../game_server";
 import { SERVER_OPCODE } from "./server_opcode";
 import { ServerPacket } from "./server_packet";
 
-const createPacketAll = (player: Player, allData: object): ServerPacket => {
+const createPacketAll = (player: Player, allData: GameData): ServerPacket => {
 	return {
 		opcode: SERVER_OPCODE.All,
 		ip: player.ip,
@@ -20,4 +20,13 @@ const createPacketAddPlayer = (existingPlayer: Player, newPlayer: Player): Serve
 	}
 }
 
-export { createPacketAll, createPacketAddPlayer };
+const createPacketAllPlants = (player: Player, plants: Plant[]): ServerPacket => {
+	return {
+		opcode: SERVER_OPCODE.AllPlants,
+		ip: player.ip,
+		port: player.port,
+		data: plants,
+	}
+}
+
+export { createPacketAll, createPacketAddPlayer, createPacketAllPlants };

@@ -9,7 +9,7 @@ import { MasterShopItem, isMasterShopItem } from './master/master_shop_item';
 import { isMasterItem } from './master/master_item';
 import { ServerPacket } from './server_packet/server_packet';
 import { EventEmitter } from 'node:events';
-import { createPacketAddPlayer, createPacketAll } from './server_packet/server_packet_creator';
+import { createPacketAddPlayer, createPacketAll, createPacketAllPlants } from './server_packet/server_packet_creator';
 
 type GameData = {
 	money: number,
@@ -169,6 +169,7 @@ class Game {
 					if (e.event.type == 'tick') {
 						this.tick();
 						this.event_history = [...this.event_history, { event: e.event, next: calcNextEventTime(e.event) }];
+						this.syncEmitter.emit('sync:tick', this.toGameData());
 					}
 				}
 				this.event_history = this.event_history.filter(h => !currentEvents.includes(h));
@@ -411,6 +412,12 @@ class GameServer {
 				sender(createPacketAddPlayer(otherPlayer, player));
 			}
 		});
+		syncEmitter.on('sync:tick', (allData: GameData) => {
+			for (let player of allData.players) {
+				sender(createPacketAllPlants(player, allData.plants));
+				// イベント情報も送信する？
+			}
+		});
 
 		// 受け取ったパケットの処理
 		while (true) {
@@ -426,4 +433,4 @@ class GameServer {
 	}
 }
 
-export { GameServer, Player };
+export { GameServer, GameData, Player, Plant };
