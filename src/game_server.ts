@@ -10,6 +10,7 @@ import { isMasterItem } from './master/master_item';
 import { ServerPacket } from './server_packet/server_packet';
 import { EventEmitter } from 'node:events';
 import { createPacketAddPlayer, createPacketAll, createPacketAllPlants } from './server_packet/server_packet_creator';
+import { isClientRequestAllDataPacket } from './client_packet/c_request_alldata';
 
 type GameData = {
 	money: number,
@@ -275,6 +276,15 @@ class Game {
 		this.addItem(item_type, [], count);
 	}
 
+	syncPlayer(ip: string, port: number) {
+		const player = this.findPlayerByIP(ip);
+		if (player == null) {
+			console.log(`${ip} プレイヤーが存在しません。`);
+			return;
+		}
+		this.syncEmitter.emit('sync:syncPlayer', player, this.toGameData());
+	}
+
 	private addItem(item_type: string, titles: string[], count: number) {
 		const item = this.findItemByTypeAndTitles(item_type, titles)
 		if (item === null) {
@@ -407,7 +417,7 @@ class GameServer {
 
 		// パケット送信処理の定義
 		syncEmitter.on('sync:whenPlayerConnected', (player: Player, allData: GameData) => {
-			sender(createPacketAll(player, allData));
+			syncEmitter.emit('sync:syncPlayer', player, allData);
 			for (let otherPlayer of allData.players.filter(p => p !== player)) {
 				sender(createPacketAddPlayer(otherPlayer, player));
 			}
@@ -418,12 +428,17 @@ class GameServer {
 				// イベント情報も送信する？
 			}
 		});
+		syncEmitter.on('sync:syncPlayer', (player: Player, allData: GameData) => {
+			sender(createPacketAll(player, allData));
+		})
 
 		// 受け取ったパケットの処理
 		while (true) {
 			for (let p of this.packetQueue) {
 				if (isClientConnectionPacket(p)) {
 					this.game.addPlayer({ name: p.name, ip: p.ip, port: p.port });
+				} else if (isClientRequestAllDataPacket(p)) {
+					this.game.syncPlayer(p.ip, p.port);
 				}
 			}
 			this.packetQueue = [];

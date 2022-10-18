@@ -1,5 +1,6 @@
 import { readClientConnection } from './c_connection'
 import { CLIENT_OPCODE } from './client_opcode'
+import { readClientRequestAllData } from './c_request_alldata';
 
 type RawPacketData = {
 	opcode: number;
@@ -22,6 +23,8 @@ export const readPacketData = (data: RawPacketData | object): object => {
 	switch (clientOpcode) {
 		case CLIENT_OPCODE.Connect:
 			return readClientConnection(data);
+		case CLIENT_OPCODE.RequestAllData:
+			return readClientRequestAllData(data);
 		case CLIENT_OPCODE.Disconnect:
 		case CLIENT_OPCODE.Unknown:
 		default:
