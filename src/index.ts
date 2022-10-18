@@ -4,7 +4,7 @@ import { readPacketData } from './client_packet/client_packet_reader';
 
 const server = createServer(25565);
 const sender = server.start(rawPacket => {
-	const clientPacket = readPacketData(rawPacket.data);
+	const clientPacket = readPacketData(rawPacket);
 	if (clientPacket === null) {
 		return;
 	}

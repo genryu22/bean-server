@@ -3,10 +3,18 @@ import { CLIENT_OPCODE } from './client_opcode'
 
 type RawPacketData = {
 	opcode: number;
+	ip: string;
+	port: number;
+}
+
+const isRawPacketData = (data: any): data is RawPacketData => {
+	return 'opcode' in data && typeof (data['opcode']) === 'number'
+		&& 'ip' in data && typeof (data['ip']) === 'string'
+		&& 'port' in data && typeof (data['port']) === 'number'
 }
 
 export const readPacketData = (data: RawPacketData | object): object => {
-	if (!('opcode' in data && typeof (data['opcode']) === 'number')) {
+	if (!isRawPacketData(data)) {
 		return null;
 	}
 

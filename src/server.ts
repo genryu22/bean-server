@@ -1,4 +1,6 @@
 import * as dgram from 'node:dgram';
+import * as ipc from 'node-ipc';
+const net = require('node:net');
 
 type RawPacket = {
 	data: object;
@@ -7,7 +9,7 @@ type RawPacket = {
 }
 
 interface Server {
-	start(listener: (rawPacket: RawPacket) => void): (packet: object, ip: string, port: number) => void;
+	start(listener: (packet: object) => void): (packet: object, ip: string, port: number) => void;
 	stop(): void;
 }
 
@@ -21,7 +23,7 @@ class UDPServer implements Server {
 		this.port = port;
 	}
 
-	start(listener: (rawPacket: RawPacket) => void): (packet: object, ip: string, port: number) => void {
+	start(listener: (packet: object) => void): (packet: object, ip: string, port: number) => void {
 		if (this.socket != null) {
 			this.socket.close();
 		}
@@ -67,6 +69,96 @@ class UDPServer implements Server {
 	}
 }
 
+class WindowsSocketServer implements Server {
+
+	private clientSocket: object;
+
+	start(listener: (packet: object) => void): (packet: object, ip: string, port: number) => void {
+		const self_server = this;
+
+		ipc.config.id = 'bean-server';
+		ipc.config.retry = 1500;
+		ipc.serve(
+			function () {
+				ipc.server.on(
+					'connect',
+					function (socket) {
+						self_server.clientSocket = socket;
+					}
+				);
+
+				ipc.server.on(
+					'bean.packet',
+					function (data, socket) {
+						listener(JSON.parse(data.toString('utf8')));
+					}
+				);
+			}
+		);
+
+		ipc.server.start();
+
+		return (packet, ip, port) => {
+			if (this.clientSocket == null) {
+				console.log('クライアント未接続');
+				return;
+			}
+			ipc.server.emit(
+				this.clientSocket,
+				'bean.packet',
+				JSON.stringify({ ...packet, ip, port })
+			);
+		}
+	}
+
+	stop(): void {
+		ipc.server.stop();
+	}
+}
+
+class TCPServer implements Server {
+
+	private clientSocket: any;
+
+	start(listener: (packet: object) => void): (packet: object, ip: string, port: number) => void {
+		const server = net.createServer((socket) => {
+			console.log('unity client connected.');
+			this.clientSocket = socket;
+			socket.on('data', function (data) {
+				try {
+					const parsed = JSON.parse(data.toString('utf8'));
+					listener(parsed);
+				} catch {
+					console.log('unityクライアントから不適切なパケット受信' + data);
+				}
+			});
+			socket.on('close', function (hadError) {
+				this.clientSocket = null;
+				console.log('unity client disconnected.');
+			})
+			socket.on('error', function (err) {
+				console.log(err);
+				this.clientSocket = null;
+			})
+		});
+
+		server.listen(25565, "127.0.0.1");
+
+		return (packet, ip, port) => {
+			if (this.clientSocket == null) {
+				console.log('クライアント未接続');
+				return;
+			}
+			this.clientSocket.write(JSON.stringify({ ...packet, ip, port }));
+		}
+	}
+
+	stop(): void {
+	}
+}
+
 export const createServer = (port: number): Server => {
-	return new UDPServer(25565);
+	return new TCPServer();
+	//return new WindowsSocketServer();
+	//return new UDPServer(25565);
 }
