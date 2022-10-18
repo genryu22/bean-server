@@ -7,6 +7,20 @@ import { MasterTitle, isMasterTitle } from './master/master_title';
 import { MasterPlant, isMasterPlant } from './master/master_plant';
 import { MasterShopItem, isMasterShopItem } from './master/master_shop_item';
 import { isMasterItem } from './master/master_item';
+import { ServerPacket } from './server_packet/server_packet';
+import { EventEmitter } from 'node:events';
+import { createPacketAddPlayer, createPacketAll } from './server_packet/server_packet_creator';
+
+type GameData = {
+	money: number,
+	players: Player[],
+	event_history: { event: MasterEvent, next: DateTime }[],
+	fieldTiles: FieldTile[],
+	farmTiles: FarmTile[],
+	plants: Plant[],
+	items: Item[],
+	item_history: string[],
+}
 
 type Position = {
 	x: number;
@@ -75,29 +89,12 @@ const calcNextEventTime = (event: MasterEvent): DateTime => {
 	}
 }
 
-class PacketSender {
-
-	private sender: (packet: object, ip: string, port: number) => void;
-
-	constructor(sender: (packet: object, ip: string, port: number) => void) {
-		this.sender = sender;
-	}
-
-	sendAllData(player: Player, gameData: object): void {
-		this.sender(gameData, player.ip, player.port);
-	}
-
-	sendShopItem(player: Player, master_shop_item: MasterShopItem): void {
-
-	}
-}
-
 // セーブとロードができるようにmasterDataList, packetsender以外のオブジェクトはpureなTypeにする。
 class Game {
 
-	private masterDataList: object[][];
+	private syncEmitter: EventEmitter;
 
-	private packetSender: PacketSender;
+	private masterDataList: object[][];
 
 	private money: number;
 
@@ -127,8 +124,8 @@ class Game {
 		this.item_history = [];
 	}
 
-	init(sender: (packet: object, ip: string, port: number) => void) {
-		this.packetSender = new PacketSender(sender);
+	init(): EventEmitter {
+		this.syncEmitter = new EventEmitter();
 
 		{
 			for (let event of getMaster(this.masterDataList, isMasterEvent)) {
@@ -158,6 +155,8 @@ class Game {
 				}
 			}
 		}
+
+		return this.syncEmitter;
 	}
 
 	update() {
@@ -170,10 +169,6 @@ class Game {
 					if (e.event.type == 'tick') {
 						this.tick();
 						this.event_history = [...this.event_history, { event: e.event, next: calcNextEventTime(e.event) }];
-
-						for (let p of this.players) {
-							this.packetSender.sendAllData(p, this.toGameData());
-						}
 					}
 				}
 				this.event_history = this.event_history.filter(h => !currentEvents.includes(h));
@@ -243,6 +238,7 @@ class Game {
 		} else {
 			this.players = [...this.players, player]
 			console.log(`${player.name}:${player.ip} connected.`);
+			this.syncEmitter.emit('sync:whenPlayerConnected', player, this.toGameData());
 		}
 	}
 
@@ -325,7 +321,7 @@ class Game {
 		}
 	}
 
-	private toGameData(): object {
+	private toGameData(): GameData {
 		return {
 			money: this.money,
 			players: this.players,
@@ -369,7 +365,7 @@ const compareArrays = (a: string[], b: string[]): boolean => {
 	return a.every(s => b.includes(s)) && b.every(s => a.includes(s))
 }
 
-export class GameServer {
+class GameServer {
 
 	private isRunning;
 
@@ -382,7 +378,7 @@ export class GameServer {
 		this.packetQueue = [];
 	}
 
-	async start(sender: (packet: object, ip: string, port: number) => void): Promise<void> {
+	async start(sender: (packet: ServerPacket) => void): Promise<void> {
 		if (this.isRunning) {
 			console.log('server is already running');
 			return;
@@ -404,9 +400,19 @@ export class GameServer {
 		this.packetQueue = [...this.packetQueue, packet];
 	}
 
-	private async gameRoutine(masterDataList: object[][], sender: (packet: object, ip: string, port: number) => void): Promise<void> {
+	private async gameRoutine(masterDataList: object[][], sender: (packet: ServerPacket) => void): Promise<void> {
 		this.game = new Game(masterDataList);
-		this.game.init(sender);
+		const syncEmitter = this.game.init();
+
+		// パケット送信処理の定義
+		syncEmitter.on('sync:whenPlayerConnected', (player: Player, allData: GameData) => {
+			sender(createPacketAll(player, allData));
+			for (let otherPlayer of allData.players.filter(p => p !== player)) {
+				sender(createPacketAddPlayer(otherPlayer, player));
+			}
+		});
+
+		// 受け取ったパケットの処理
 		while (true) {
 			for (let p of this.packetQueue) {
 				if (isClientConnectionPacket(p)) {
@@ -419,3 +425,5 @@ export class GameServer {
 		}
 	}
 }
+
+export { GameServer, Player };
