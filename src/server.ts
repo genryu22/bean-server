@@ -49,7 +49,7 @@ class TCPServer implements Server {
 				console.log('クライアント未接続');
 				return;
 			}
-			this.clientSocket.write(JSON.stringify(packet));
+			this.clientSocket.write(JSON.stringify(packet) + '\n');
 		}
 	}
 
