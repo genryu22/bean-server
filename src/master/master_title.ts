@@ -8,7 +8,7 @@ type MasterTitle = {
 	weight_b_factor: number,
 	weight_c_factor: number,
 	max_harvest_count_factor: number,
-	crop_factor: number,
+	crop_override: string,
 	crop_count_factor: number,
 	title_prob_factor: number,
 };
@@ -23,7 +23,7 @@ const isMasterTitle = (data: any): data is MasterTitle => {
 		&& 'weight_b_factor' in data && typeof data['weight_b_factor'] === 'number'
 		&& 'weight_c_factor' in data && typeof data['weight_c_factor'] === 'number'
 		&& 'max_harvest_count_factor' in data && typeof data['max_harvest_count_factor'] === 'number'
-		&& 'crop_factor' in data && typeof data['crop_factor'] === 'number'
+		&& 'crop_override' in data && typeof data['crop_override'] === 'string'
 		&& 'crop_count_factor' in data && typeof data['crop_count_factor'] === 'number'
 		&& 'title_prob_factor' in data && typeof data['title_prob_factor'] === 'number'
 };
