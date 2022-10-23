@@ -15,7 +15,7 @@ import { isClientRequestAllDataPacket } from './client_packet/c_request_alldata'
 type GameData = {
 	money: number,
 	players: Player[],
-	event_history: { event: MasterEvent, next: DateTime }[],
+	event_history: { event_type: string, next: DateTime }[],
 	fieldTiles: FieldTile[],
 	farmTiles: FarmTile[],
 	plants: Plant[],
@@ -101,7 +101,7 @@ class Game {
 
 	private players: Player[];
 
-	private event_history: { event: MasterEvent, next: DateTime }[]
+	private event_history: { event_type: string, next: DateTime }[]
 
 	private fieldTiles: FieldTile[];
 
@@ -130,10 +130,10 @@ class Game {
 
 		{
 			for (let event of getMaster(this.masterDataList, isMasterEvent)) {
-				if (this.event_history.some(h => h.event.type == event.type)) {
+				if (this.event_history.some(h => h.event_type == event.type)) {
 					continue;
 				}
-				this.event_history = [...this.event_history, { event, next: calcNextEventTime(event) }]
+				this.event_history = [...this.event_history, { event_type: event.type, next: calcNextEventTime(event) }]
 			}
 		}
 
@@ -167,9 +167,15 @@ class Game {
 			{
 				const currentEvents = this.event_history.filter(h => compare(h.next, now));
 				for (let e of currentEvents) {
-					if (e.event.type == 'tick') {
+					if (e.event_type == 'tick') {
 						this.tick();
-						this.event_history = [...this.event_history, { event: e.event, next: calcNextEventTime(e.event) }];
+						const events = getMaster(this.masterDataList, isMasterEvent).filter(me => me.type == e.event_type)
+						if (events.length == 0) {
+							console.log(`${e.event_type} イベントマスターが存在しません。`);
+						}
+						else {
+							this.event_history = [...this.event_history, { event_type: e.event_type, next: calcNextEventTime(events[0]) }];
+						}
 						this.syncEmitter.emit('sync:tick', this.toGameData());
 					}
 				}
