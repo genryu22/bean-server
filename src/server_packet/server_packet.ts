@@ -1,14 +1,12 @@
 type ServerPacket = {
 	opcode: number,
-	ip: string,
-	port: number,
+	id: string,
 	data: object,
 };
 
 const isServerPacket = (value: any): value is ServerPacket => {
 	return 'opcode' in value && typeof value['opcode'] === 'number'
-		&& 'ip' in value && typeof value['ip'] === 'string'
-		&& 'port' in value && typeof value['port'] === 'number'
+		&& 'id' in value && typeof value['id'] === 'string'
 		&& 'data' in value && typeof value['data'] === 'object'
 }
 

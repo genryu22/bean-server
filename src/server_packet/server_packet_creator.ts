@@ -5,8 +5,7 @@ import { ServerPacket } from "./server_packet";
 const createPacketAll = (player: Player, allData: GameData): ServerPacket => {
 	return {
 		opcode: SERVER_OPCODE.All,
-		ip: player.ip,
-		port: player.port,
+		id: player.id,
 		data: allData,
 	}
 }
@@ -14,8 +13,7 @@ const createPacketAll = (player: Player, allData: GameData): ServerPacket => {
 const createPacketAddPlayer = (existingPlayer: Player, newPlayer: Player): ServerPacket => {
 	return {
 		opcode: SERVER_OPCODE.AddPlayer,
-		ip: existingPlayer.ip,
-		port: existingPlayer.port,
+		id: existingPlayer.id,
 		data: newPlayer,
 	}
 }
@@ -23,8 +21,7 @@ const createPacketAddPlayer = (existingPlayer: Player, newPlayer: Player): Serve
 const createPacketAllPlants = (player: Player, plants: Plant[]): ServerPacket => {
 	return {
 		opcode: SERVER_OPCODE.AllPlants,
-		ip: player.ip,
-		port: player.port,
+		id: player.id,
 		data: plants,
 	}
 }

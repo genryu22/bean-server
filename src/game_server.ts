@@ -29,9 +29,8 @@ type Position = {
 }
 
 type Player = {
-	ip: string;
+	id: string;
 	name: string;
-	port: number;
 }
 
 type FieldTile = {
@@ -214,26 +213,26 @@ class Game {
 		}
 	}
 
-	harvest(ip: string, plant_id: string): void {
-		const player = this.findPlayerByIP(ip);
+	harvest(id: string, plant_id: string): void {
+		const player = this.findPlayerByID(id);
 		if (player == null) {
-			console.log(`${ip} プレイヤーが存在しません。`);
+			console.log(`${id} プレイヤーが存在しません。`);
 			return;
 		}
 		const plant = this.findPlantByID(plant_id);
 		if (plant === null) {
-			console.log(`${player.name}:${ip} 植物が存在しません。`);
+			console.log(`${player.name}:${id} 植物が存在しません。`);
 			return;
 		}
 
 		if (plant.growth < 100) {
-			console.log(`${player.name}:${ip} 成長量が十分ではありません。`)
+			console.log(`${player.name}:${id} 成長量が十分ではありません。`)
 			return;
 		}
 
 		const plant_master = getMaster(this.masterDataList, isMasterPlant).filter(mp => mp.type == plant.plant_type);
 		if (plant_master.length == 0) {
-			console.log(`${player.name}:${ip} 植物マスターが存在しません。`);
+			console.log(`${player.name}:${id} 植物マスターが存在しません。`);
 			return;
 		}
 
@@ -241,40 +240,40 @@ class Game {
 	}
 
 	addPlayer(player: Player): void {
-		if (this.players.some(p => p.ip == player.ip)) {
-			console.log(`${player.name}:${player.ip} try to connect, but already connected.`);
+		if (this.players.some(p => p.id == player.id)) {
+			console.log(`${player.name}:${player.id} try to connect, but already connected.`);
 		} else {
 			this.players = [...this.players, player]
-			console.log(`${player.name}:${player.ip} connected.`);
+			console.log(`${player.name}:${player.id} connected.`);
 			this.syncEmitter.emit('sync:whenPlayerConnected', player, this.toGameData());
 		}
 	}
 
-	buy(ip: string, item_type: string, count: number): void {
+	buy(id: string, item_type: string, count: number): void {
 		if (count <= 0) {
-			console.log(`${ip} 購入数が不正`);
+			console.log(`${id} 購入数が不正`);
 			return;
 		}
-		const player = this.findPlayerByIP(ip);
+		const player = this.findPlayerByID(id);
 		if (player == null) {
-			console.log(`${ip} プレイヤーが存在しません。`);
+			console.log(`${id} プレイヤーが存在しません。`);
 			return;
 		}
 
 		const shopItems = getMaster(this.masterDataList, isMasterShopItem);
 		if (shopItems.every(si => si.item_type != item_type)) {
-			console.log(`${player.name}:${ip} ショップにアイテム ${item_type} が登録されていません。`);
+			console.log(`${player.name}:${id} ショップにアイテム ${item_type} が登録されていません。`);
 			return;
 		}
 
 		const itemMasters = getMaster(this.masterDataList, isMasterItem).filter(im => im.type == item_type);
 		if (itemMasters.length == 0) {
-			console.log(`${player.name}:${ip} マスターにアイテム ${item_type} が登録されていません。`);
+			console.log(`${player.name}:${id} マスターにアイテム ${item_type} が登録されていません。`);
 			return;
 		}
 
 		if (itemMasters[0].buy_price * count > this.money) {
-			console.log(`${player.name}:${ip} ${item_type} ${this.money} お金が足りません`);
+			console.log(`${player.name}:${id} ${item_type} ${this.money} お金が足りません`);
 			return;
 		}
 
@@ -282,10 +281,10 @@ class Game {
 		this.addItem(item_type, [], count);
 	}
 
-	syncPlayer(ip: string, port: number) {
-		const player = this.findPlayerByIP(ip);
+	syncPlayer(id: string) {
+		const player = this.findPlayerByID(id);
 		if (player == null) {
-			console.log(`${ip} プレイヤーが存在しません。`);
+			console.log(`${id} プレイヤーが存在しません。`);
 			return;
 		}
 		this.syncEmitter.emit('sync:syncPlayer', player, this.toGameData());
@@ -329,8 +328,8 @@ class Game {
 		}
 	}
 
-	private findPlayerByIP(ip: string): Player | null {
-		const res = this.players.filter(p => p.ip == ip);
+	private findPlayerByID(id: string): Player | null {
+		const res = this.players.filter(p => p.id == id);
 		if (res.length > 0) {
 			return res[0];
 		} else {
@@ -442,9 +441,9 @@ class GameServer {
 		while (true) {
 			for (let p of this.packetQueue) {
 				if (isClientConnectionPacket(p)) {
-					this.game.addPlayer({ name: p.name, ip: p.ip, port: p.port });
+					this.game.addPlayer({ name: p.name, id: p.id });
 				} else if (isClientRequestAllDataPacket(p)) {
-					this.game.syncPlayer(p.ip, p.port);
+					this.game.syncPlayer(p.id);
 				}
 			}
 			this.packetQueue = [];

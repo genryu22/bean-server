@@ -1,13 +1,11 @@
 type C_Connection = {
 	name: string;
-	ip: string;
-	port: number;
+	id: string;
 }
 
 const isClientConnectionPacket = (data: object): data is C_Connection => {
 	return 'name' in data && typeof (data['name']) == 'string'
-		&& 'ip' in data && typeof (data['ip']) == 'string'
-		&& 'port' in data && typeof (data['port']) == 'number';
+		&& 'id' in data && typeof (data['id']) == 'string';
 }
 
 const readClientConnection = (data: C_Connection | object): C_Connection | null => {

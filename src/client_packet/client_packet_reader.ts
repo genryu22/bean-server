@@ -4,14 +4,12 @@ import { readClientRequestAllData } from './c_request_alldata';
 
 type RawPacketData = {
 	opcode: number;
-	ip: string;
-	port: number;
+	id: string;
 }
 
 const isRawPacketData = (data: any): data is RawPacketData => {
 	return 'opcode' in data && typeof (data['opcode']) === 'number'
-		&& 'ip' in data && typeof (data['ip']) === 'string'
-		&& 'port' in data && typeof (data['port']) === 'number'
+		&& 'id' in data && typeof (data['id']) === 'string'
 }
 
 export const readPacketData = (data: RawPacketData | object): object => {
