@@ -9,8 +9,9 @@ import { MasterShopItem, isMasterShopItem } from './master/master_shop_item';
 import { isMasterItem } from './master/master_item';
 import { ServerPacket } from './server_packet/server_packet';
 import { EventEmitter } from 'node:events';
-import { createPacketAddPlayer, createPacketAll, createPacketAllPlants } from './server_packet/server_packet_creator';
+import { createPacketAddPlayer, createPacketAll, createPacketAllPlants, createPacketDisconnectPlayer } from './server_packet/server_packet_creator';
 import { isClientRequestAllDataPacket } from './client_packet/c_request_alldata';
+import { isClientDisconnectionPacket } from './client_packet/c_disconnection';
 
 type GameData = {
 	money: number,
@@ -290,6 +291,18 @@ class Game {
 		this.syncEmitter.emit('sync:syncPlayer', player, this.toGameData());
 	}
 
+	disconnectPlayer(id: string) {
+		const player = this.findPlayerByID(id);
+		if (player == null) {
+			console.log(`${id} プレイヤーが存在しません。`);
+			return;
+		} else {
+			this.players = this.players.filter(p => p.id != id);
+			console.log(`${player.name}:${player.id} disconnected.`);
+			this.syncEmitter.emit('sync:whenPlayerDisconnected', id);
+		}
+	}
+
 	private addItem(item_type: string, titles: string[], count: number) {
 		const item = this.findItemByTypeAndTitles(item_type, titles)
 		if (item === null) {
@@ -427,6 +440,11 @@ class GameServer {
 				sender(createPacketAddPlayer(otherPlayer, player));
 			}
 		});
+		syncEmitter.on('sync:whenPlayerDisconnected', (players: Player[], disconnectedPlayerID: string) => {
+			for (let otherPlayer of players.filter(p => p.id !== disconnectedPlayerID)) {
+				sender(createPacketDisconnectPlayer(otherPlayer, disconnectedPlayerID));
+			}
+		});
 		syncEmitter.on('sync:tick', (allData: GameData) => {
 			for (let player of allData.players) {
 				sender(createPacketAllPlants(player, allData.plants));
@@ -444,6 +462,8 @@ class GameServer {
 					this.game.addPlayer({ name: p.name, id: p.id });
 				} else if (isClientRequestAllDataPacket(p)) {
 					this.game.syncPlayer(p.id);
+				} else if (isClientDisconnectionPacket(p)) {
+					this.game.disconnectPlayer(p.id);
 				}
 			}
 			this.packetQueue = [];

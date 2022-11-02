@@ -18,6 +18,14 @@ const createPacketAddPlayer = (existingPlayer: Player, newPlayer: Player): Serve
 	}
 }
 
+const createPacketDisconnectPlayer = (target: Player, disconnectedPlayerID: string): ServerPacket => {
+	return {
+		opcode: SERVER_OPCODE.DisconnectPlayer,
+		id: target.id,
+		data: { disconnectedPlayerID },
+	}
+}
+
 const createPacketAllPlants = (player: Player, plants: Plant[]): ServerPacket => {
 	return {
 		opcode: SERVER_OPCODE.AllPlants,
@@ -26,4 +34,4 @@ const createPacketAllPlants = (player: Player, plants: Plant[]): ServerPacket =>
 	}
 }
 
-export { createPacketAll, createPacketAddPlayer, createPacketAllPlants };
+export { createPacketAll, createPacketAddPlayer, createPacketDisconnectPlayer, createPacketAllPlants };

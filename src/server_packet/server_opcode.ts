@@ -3,4 +3,5 @@ export enum SERVER_OPCODE {
 	All,
 	AddPlayer,
 	AllPlants,
+	DisconnectPlayer,
 }
