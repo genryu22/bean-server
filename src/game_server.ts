@@ -241,8 +241,11 @@ class Game {
 	}
 
 	addPlayer(player: Player): void {
-		if (this.players.some(p => p.id == player.id)) {
+		var i = this.players.findIndex(p => p.id == player.id);
+		if (i != -1) {
 			console.log(`${player.name}:${player.id} try to connect, but already connected.`);
+			this.players[i] = player;
+			this.syncEmitter.emit('sync:syncPlayer', player, this.toGameData());
 		} else {
 			this.players = [...this.players, player]
 			console.log(`${player.name}:${player.id} connected.`);
