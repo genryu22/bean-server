@@ -1,0 +1,19 @@
+version: '3'
+services:
+  bean-server-dev-test:
+    image: node:18
+    ports:
+      - "25565:25565"
+    working_dir: /bean_server_app
+    entrypoint: /bin/bash entrypoint_test.sh
+    volumes:
+      - ./:/bean_server_app
+    # bean-server-dev:
+    #   build:
+    #     context: .
+    #     target: install_node_modules
+    #   ports:
+    #     - "25565:25565"
+    #   volumes:
+    #     - ./src:/bean_server_app/src
+    #     - ./master_csv:/bean_server_app//master_csv
